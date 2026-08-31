@@ -40,6 +40,10 @@ PACKAGES=(
     "lvm2"
     "wget"
     "zip"
+    "libcurl"
+    "openssl"
+    "xz-libs"
+    "policycoreutils-python-utils"
 )
 
 for package in "${PACKAGES[@]}"; do
@@ -63,24 +67,31 @@ sudo particiona_disco_v2.sh -q /dev/sdc
 ###############
 # Modificar GRUB
 ###############
+if ! [ -f ".grub"]; then 
+    GRUB_FILE="/etc/default/grub"
+    PARAMS="numa=off transparent_hugepage=never scsi_mod.use_blk_mq=1 dm_mod.use_blk_mq=y"
 
-GRUB_FILE="/etc/default/grub"
-PARAMS="numa=off transparent_hugepage=never scsi_mod.use_blk_mq=1 dm_mod.use_blk_mq=y"
+    # Backup
+    sudo cp -a "$GRUB_FILE" "${GRUB_FILE}.bak"
 
-# Backup
-sudo cp -a "$GRUB_FILE" "${GRUB_FILE}.bak"
+    # Añadir los parámetros a GRUB_CMDLINE_LINUX_DEFAULT
+    sudo sed -i -E \
+    "s|^(GRUB_CMDLINE_LINUX_DEFAULT=\"[^\"]*)\"|\1 ${PARAMS}\"|" \
+    "$GRUB_FILE"
 
-# Añadir los parámetros a GRUB_CMDLINE_LINUX_DEFAULT
-sudo sed -i -E \
-  "s|^(GRUB_CMDLINE_LINUX_DEFAULT=\"[^\"]*)\"|\1 ${PARAMS}\"|" \
-  "$GRUB_FILE"
+    # Regenerar configuración de GRUB
+    sudo grub2-mkconfig -o /boot/grub2/grub.cfg --update-bls-cmdline
 
-# Regenerar configuración de GRUB
-sudo grub2-mkconfig -o /boot/grub2/grub.cfg --update-bls-cmdline
-
-# echo "Parámetros GRUB añadidos correctamente."
-log_info "Parámetros GRUB añadidos correctamente."
-sudo grubby --info=DEFAULT | grep '^args'
+    # echo "Parámetros GRUB añadidos correctamente."
+    log_info "Parámetros GRUB añadidos correctamente."
+    sudo grubby --info=DEFAULT | grep '^args'
+    log_info "Reboot de la VM en 5 seg."
+    wait 5
+    echo "/etc/default/grub modificado" > .grub
+    sudo reboot
+else 
+    log_info "Archivo grub ya modificado."
+fi
 
 
 ######
@@ -135,19 +146,22 @@ check_user() {
         echo "[ERROR] El usuario '$USERNAME' no existe."
         return 1
     fi
-
-    echo "[OK] El usuario '$USERNAME' existe."
-
+    #echo "[OK] El usuario '$USERNAME' existe."
+    log_info "El usuario '$USERNAME' existe."
     if id -nG "$USERNAME" | grep -qw wheel; then
-        echo "[OK] El usuario '$USERNAME' pertenece al grupo wheel."
+        #echo "[OK] El usuario '$USERNAME' pertenece al grupo wheel."
+        log_info "El usuario '$USERNAME' pertenece al grupo wheel."
     else
-        echo "[INFO] El usuario '$USERNAME' no pertenece al grupo wheel."
+        #echo "[INFO] El usuario '$USERNAME' no pertenece al grupo wheel."
+        log_info "El usuario '$USERNAME' no pertenece al grupo wheel."
     fi
 
     if sudo -l -U "$USERNAME" >/dev/null 2>&1; then
-        echo "[OK] El usuario '$USERNAME' tiene permisos sudo."
+        #echo "[OK] El usuario '$USERNAME' tiene permisos sudo."
+        log_info "El usuario '$USERNAME' tiene permisos sudo."
     else
-        echo "[ERROR] El usuario '$USERNAME' NO tiene permisos sudo."
+        #echo "[ERROR] El usuario '$USERNAME' NO tiene permisos sudo."
+        log_info "El usuario '$USERNAME' NO tiene permisos sudo."
         return 1
     fi
 }
@@ -163,7 +177,10 @@ if ! id "$USERNAME" >/dev/null 2>&1; then
         --user-group \
         "$USERNAME"
 
-    echo "[OK] Usuario '$USERNAME' creado."
+    echo "$USERNAME:nutanix/4u" | sudo chpasswd
+
+    #echo "[OK] Usuario '$USERNAME' creado."
+    log_info "Usuario '$USERNAME' creado."
 fi
 
 # Crear configuración sudoers
@@ -250,3 +267,131 @@ sudo mkdir /mongodb/data
 sudo mkdir /mongodb/log
 
 sudo chown -R mongod:mongod /mongodb
+sudo chmod 750 /mongodb/data /mongodb/log
+
+####################
+# Descargar e instalar MongoDB
+####################
+
+download_file() {
+    local ARCHIVO=$1
+    if curl -fsSL -O "$ARCHIVO"; then
+        log_info "$ARCHIVO descargado correctamente."
+    else
+        log_error "No se pudo descargar el archivo desde $ARCHIVO"
+        exit 1
+    fi
+}
+
+extract_files() {
+    local ARCHIVO=$1
+    if tar zxf $ARCHIVO; then
+        log_info "$ARCHIVO extraído correctamente."
+    else
+        log_error "$ARCHIVO no se pudo extraer."
+        exit 1
+    fi
+}
+
+log_info "Bajando MongoDB"
+
+download_file https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-rhel93-8.0.23.tgz
+download_file https://fastdl.mongodb.org/tools/db/mongodb-database-tools-rhel93-x86_64-100.17.0.tgz 
+download_file https://downloads.mongodb.com/compass/mongosh-2.6.0-linux-x64.tgz 
+
+log_info "Extrayendo archivos"
+extract_files mongodb-linux-x86_64-rhel93-8.0.23.tgz
+extract_files mongodb-database-tools-rhel93-x86_64-100.17.0.tgz 
+extract_files mongosh-2.6.0-linux-x64.tgz  
+
+log_info "Moviendo software a /mongodb_softwre/bin"
+sudo mv mongodb-database-tools-rhel93-x86_64-100.17.0/bin/* /mongodb_software/bin
+sudo mv mongodb-linux-x86_64-rhel93-8.0.23/bin/* /mongodb_software/bin
+sudo mv mongosh-2.6.0-linux-x64/bin/* /mongodb_software/bin
+
+sudo chown root:root /mongodb_software/bin/*
+log_info "MongoDB instalado en /mongodb_software/bin"
+
+#################
+# Configurar /etc/mongod.conf
+##################
+
+sudo tee /etc/mongod.conf >/dev/null <<'EOF'
+storage:
+  dbPath: /mongodb/data
+
+systemLog:
+  destination: file
+  path: /mongodb/log/mongod.log
+  logAppend: true
+
+processManagement:
+  fork: false
+
+net:
+  port: 27017
+  bindIp: 0.0.0.0
+EOF
+
+sudo chown root:mongod /etc/mongod.conf
+sudo chmod 640 /etc/mongod.conf
+
+#################
+# Configurar /etc/systemd/system/mongod.service 
+##################
+
+sudo tee /etc/systemd/system/mongod.service >/dev/null <<'EOF'
+[Unit]
+Description=MongoDB Community Edition 8.0.23
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+User=mongod
+Group=mongod
+ExecStart=/mongodb_software/bin/mongod --config /etc/mongod.conf
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+LimitFSIZE=infinity
+LimitCPU=infinity
+LimitAS=infinity
+LimitNOFILE=64000
+LimitNPROC=64000
+TimeoutStartSec=0
+TimeoutStopSec=60
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+
+########################
+# Configurar permisos en SELinux
+########################
+sudo dnf install -y policycoreutils-python-utils
+
+sudo semanage fcontext -a -t bin_t "/mongodb_software/bin(/.*)?"
+sudo restorecon -Rv /mongodb_software/bin
+# ls -lZ /mongodb_software/bin/mongod
+# Lo importante aquí es: bin_t
+sudo semanage fcontext -a -t mongod_var_lib_t "/mongodb/data(/.*)?"
+sudo restorecon -Rv /mongodb/data
+# ls -ldZ /mongodb/data
+sudo semanage fcontext -a -t mongod_log_t "/mongodb/log(/.*)?"
+sudo restorecon -Rv /mongodb/log
+# ls -ldZ /mongodb/log
+
+
+#################
+# Levantar MongoDB
+##################
+
+sudo systemctl daemon-reload
+sudo systemctl enable mongod
+sudo systemctl start mongod
+sudo systemctl status mongod
