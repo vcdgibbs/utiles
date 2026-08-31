@@ -29,9 +29,9 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-###############
+#######################################
 # instalación de software faltante
-###############
+#######################################
 
 PACKAGES=(
     "python3.12"
@@ -55,19 +55,19 @@ for package in "${PACKAGES[@]}"; do
     fi
 done
 
-##############
+######################
 # Formateo de discos
-##############
+######################
 curl -LO https://raw.githubusercontent.com/vcdgibbs/utiles/refs/heads/main/particiona_disco_v2.sh
 chmod +x particiona_disco_v2.sh
 
 sudo particiona_disco_v2.sh -q /dev/sdb
 sudo particiona_disco_v2.sh -q /dev/sdc
 
-###############
+#######################
 # Modificar GRUB
-###############
-if ! [ -f ".grub"]; then 
+#######################
+if ! [ -f "$PWD/.grub" ]; then 
     GRUB_FILE="/etc/default/grub"
     PARAMS="numa=off transparent_hugepage=never scsi_mod.use_blk_mq=1 dm_mod.use_blk_mq=y"
 
@@ -86,17 +86,16 @@ if ! [ -f ".grub"]; then
     log_info "Parámetros GRUB añadidos correctamente."
     sudo grubby --info=DEFAULT | grep '^args'
     log_info "Reboot de la VM en 5 seg."
-    wait 5
-    echo "/etc/default/grub modificado" > .grub
+    sleep 5
+    echo "/etc/default/grub modificado" > $PWD/.grub
     sudo reboot
 else 
     log_info "Archivo grub ya modificado."
 fi
 
-
-######
+################################
 # Modificar sysctl.conf
-######
+###############################
 
 SYSCTL_FILE="/etc/sysctl.conf"
 
@@ -135,29 +134,23 @@ sudo sysctl -p "$SYSCTL_FILE"
 # echo "sysctl configuration applied successfully."
 log_info "Configuración sysctl exitosa"
 
-###############
+########################################
 # Crea usuario mongod si no exite
-###############
+########################################
 
 check_user() {
     local USERNAME="$1"
-
     if ! id "$USERNAME" >/dev/null 2>&1; then
         echo "[ERROR] El usuario '$USERNAME' no existe."
         return 1
     fi
-    #echo "[OK] El usuario '$USERNAME' existe."
     log_info "El usuario '$USERNAME' existe."
     if id -nG "$USERNAME" | grep -qw wheel; then
-        #echo "[OK] El usuario '$USERNAME' pertenece al grupo wheel."
         log_info "El usuario '$USERNAME' pertenece al grupo wheel."
     else
-        #echo "[INFO] El usuario '$USERNAME' no pertenece al grupo wheel."
         log_info "El usuario '$USERNAME' no pertenece al grupo wheel."
     fi
-
     if sudo -l -U "$USERNAME" >/dev/null 2>&1; then
-        #echo "[OK] El usuario '$USERNAME' tiene permisos sudo."
         log_info "El usuario '$USERNAME' tiene permisos sudo."
     else
         #echo "[ERROR] El usuario '$USERNAME' NO tiene permisos sudo."
@@ -165,7 +158,6 @@ check_user() {
         return 1
     fi
 }
-
 
 USERNAME="mongod"
 # Crear usuario si no existe
@@ -185,7 +177,6 @@ fi
 
 # Crear configuración sudoers
 if ! sudo test -f "/etc/sudoers.d/$USERNAME"; then
-    #echo "[INFO] Configurando sudoers para '$USERNAME'..."
     log_info "Configurando sudoers para '$USERNAME'..."
     sudo tee "/etc/sudoers.d/$USERNAME" > /dev/null <<EOF
 $USERNAME ALL=(ALL) ALL
@@ -194,10 +185,8 @@ EOF
     sudo chmod 440 "/etc/sudoers.d/$USERNAME"
 
     if sudo visudo -cf "/etc/sudoers.d/$USERNAME" >/dev/null 2>&1; then
-        #echo "[OK] Sudoers configurado."
         log_info "Sudoers configurado."
     else
-        #echo "[ERROR] Configuración sudoers inválida."
         log_error "Configuración sudoers inválida."
         sudo rm -f "/etc/sudoers.d/$USERNAME"
         exit 1
@@ -208,9 +197,9 @@ fi
 # Comprobar configuración final
 check_user "$USERNAME"
 
-#########################
+#################################
 ## Modificar limits.conf
-#########################
+#################################
 
 LIMITS_FILE="/etc/security/limits.conf"
 
@@ -241,9 +230,9 @@ EOF
 #echo "[OK] Límites de mongod configurados en $LIMITS_FILE"
 log_info "Límites de mongod configurados en $LIMITS_FILE"
 
-########################
+########################################
 # Armar la estructura de directorios
-########################
+########################################
 
 sudo mkdir /mongodb_software
 sudo mkdir /mongodb
@@ -269,9 +258,9 @@ sudo mkdir /mongodb/log
 sudo chown -R mongod:mongod /mongodb
 sudo chmod 750 /mongodb/data /mongodb/log
 
-####################
+####################################
 # Descargar e instalar MongoDB
-####################
+####################################
 
 download_file() {
     local ARCHIVO=$1
@@ -312,9 +301,9 @@ sudo mv mongosh-2.6.0-linux-x64/bin/* /mongodb_software/bin
 sudo chown root:root /mongodb_software/bin/*
 log_info "MongoDB instalado en /mongodb_software/bin"
 
-#################
+#################################
 # Configurar /etc/mongod.conf
-##################
+##################################
 
 sudo tee /etc/mongod.conf >/dev/null <<'EOF'
 storage:
@@ -336,9 +325,9 @@ EOF
 sudo chown root:mongod /etc/mongod.conf
 sudo chmod 640 /etc/mongod.conf
 
-#################
+#################################################
 # Configurar /etc/systemd/system/mongod.service 
-##################
+##################################################
 
 sudo tee /etc/systemd/system/mongod.service >/dev/null <<'EOF'
 [Unit]
@@ -369,10 +358,9 @@ ProtectHome=true
 WantedBy=multi-user.target
 EOF
 
-
-########################
+################################
 # Configurar permisos en SELinux
-########################
+################################
 sudo dnf install -y policycoreutils-python-utils
 
 sudo semanage fcontext -a -t bin_t "/mongodb_software/bin(/.*)?"
@@ -386,10 +374,9 @@ sudo semanage fcontext -a -t mongod_log_t "/mongodb/log(/.*)?"
 sudo restorecon -Rv /mongodb/log
 # ls -ldZ /mongodb/log
 
-
-#################
+#########################
 # Levantar MongoDB
-##################
+##########################
 
 sudo systemctl daemon-reload
 sudo systemctl enable mongod
