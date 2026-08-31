@@ -55,15 +55,6 @@ for package in "${PACKAGES[@]}"; do
     fi
 done
 
-######################
-# Formateo de discos
-######################
-curl -LO https://raw.githubusercontent.com/vcdgibbs/utiles/refs/heads/main/particiona_disco_v2.sh
-chmod +x particiona_disco_v2.sh
-
-sudo particiona_disco_v2.sh -q /dev/sdb
-sudo particiona_disco_v2.sh -q /dev/sdc
-
 #######################
 # Modificar GRUB
 #######################
@@ -91,6 +82,24 @@ if ! [ -f "$PWD/.grub" ]; then
     sudo reboot
 else 
     log_info "Archivo grub ya modificado."
+fi
+
+############################
+# Formateo de discos
+############################
+
+if ! [ -f "$PWD/particiona_disco_v2.sh" ]; then
+    log_info "Bajando particiona_disco_v2.sh"
+    curl -LO https://raw.githubusercontent.com/vcdgibbs/utiles/refs/heads/main/particiona_disco_v2.sh
+    chmod +x particiona_disco_v2.sh
+fi
+if ! [ -f "$PWD/.sdb" ]; then 
+    sudo ./particiona_disco_v2.sh -q /dev/sdb
+    echo "/dev/sdb formateado" > .$PWD/sdb
+fi
+if ! [ -f "$PWD/.sdc" ]; then 
+    sudo ./particiona_disco_v2.sh -q /dev/sdc
+    echo "/dev/sdb formateado" > .$PWD/sdc
 fi
 
 ################################
@@ -382,3 +391,36 @@ sudo systemctl daemon-reload
 sudo systemctl enable mongod
 sudo systemctl start mongod
 sudo systemctl status mongod
+
+
+############################################################
+## Crear el usuario administrador inicial
+## Si mongosh está disponible:
+## 
+## /mongodb_software/bin/mongosh --host 127.0.0.1 --port 27017
+## 
+## Dentro de mongosh:
+## 
+## use admin
+## 
+## db.createUser({
+##   user: "admin",
+##   pwd: "<password>",
+##   roles: [
+##  { role: "root", db: "admin" }
+##   ]
+## })
+## 
+## MongoDB permite crear el primer usuario mediante la excepción de localhost 
+## cuando la autorización está habilitada y todavía no existen usuarios. 
+## Después de crear el primer usuario, esa excepción deja de aplicar.  
+## 
+## Comprobar autenticación:
+## 
+## /mongodb_software/bin/mongosh \
+##   --host 127.0.0.1 \
+##   --port 27017 \
+##   --authenticationDatabase admin \
+##   -u admin \
+##   -p
+##################################################################
