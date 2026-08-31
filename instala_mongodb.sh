@@ -95,11 +95,11 @@ if ! [ -f "$PWD/particiona_disco_v2.sh" ]; then
 fi
 if ! [ -f "$PWD/.sdb" ]; then 
     sudo ./particiona_disco_v2.sh -q /dev/sdb
-    echo "/dev/sdb formateado" > .$PWD/sdb
+    echo "/dev/sdb formateado" > $PWD/.sdb
 fi
 if ! [ -f "$PWD/.sdc" ]; then 
     sudo ./particiona_disco_v2.sh -q /dev/sdc
-    echo "/dev/sdb formateado" > .$PWD/sdc
+    echo "/dev/sdb formateado" > $PWD/.sdc
 fi
 
 ################################
