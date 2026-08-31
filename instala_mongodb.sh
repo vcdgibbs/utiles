@@ -223,3 +223,30 @@ EOF
 
 #echo "[OK] Límites de mongod configurados en $LIMITS_FILE"
 log_info "Límites de mongod configurados en $LIMITS_FILE"
+
+########################
+# Armar la estructura de directorios
+########################
+
+sudo mkdir /mongodb_software
+sudo mkdir /mongodb
+
+UUID_B=$(lsblk -no UUID /dev/sdb1)
+UUID_C=$(lsblk -no UUID /dev/sdc1)
+
+sudo cp /etc/fstab /etc/fstab.bak
+
+sudo tee -a /etc/fstab  > /dev/null<<EOF
+UUID=${UUID_B} /mongodb_software ext4 defaults 0 0
+UUID=${UUID_C} /mongodb          ext4 defaults 0 0
+EOF
+
+sudo systemctl daemon-reload
+sudo mount /mongodb_software
+sudo mount /mongodb
+
+sudo mkdir /mongodb_software/bin
+sudo mkdir /mongodb/data
+sudo mkdir /mongodb/log
+
+sudo chown -R mongod:mongod /mongodb
