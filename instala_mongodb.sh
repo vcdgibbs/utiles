@@ -191,3 +191,35 @@ fi
 # Comprobar configuración final
 check_user "$USERNAME"
 
+#########################
+## Modificar limits.conf
+#########################
+
+LIMITS_FILE="/etc/security/limits.conf"
+
+# Backup
+sudo cp -a "$LIMITS_FILE" "${LIMITS_FILE}.bak"
+
+# Eliminar configuraciones anteriores de mongod
+sudo sed -i '/^[[:space:]]*mongod[[:space:]]/d' "$LIMITS_FILE"
+
+# Agregar límites para mongod
+sudo tee -a "$LIMITS_FILE" > /dev/null <<'EOF'
+
+# MongoDB limits
+mongod hard  cpu      unlimited
+mongod soft  cpu      unlimited
+mongod hard  memlock  unlimited
+mongod soft  memlock  unlimited
+mongod hard  as       unlimited
+mongod soft  as       unlimited
+mongod hard  fsize    unlimited
+mongod soft  fsize    unlimited
+mongod soft  nofile   64000
+mongod hard  nofile   64000
+mongod soft  nproc    64000
+mongod hard  nproc    64000
+EOF
+
+#echo "[OK] Límites de mongod configurados en $LIMITS_FILE"
+log_info "Límites de mongod configurados en $LIMITS_FILE"
