@@ -1,7 +1,7 @@
 #!/bin/bash
 
 if [ $# -eq 0 ]; then
-    echo "Proporsionar el archivo de variables de ambiente."
+    echo "Proporcionar el archivo de variables de ambiente."
     exit 1
 fi
 
