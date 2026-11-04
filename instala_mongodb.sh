@@ -44,6 +44,7 @@ PACKAGES=(
     "openssl"
     "xz-libs"
     "policycoreutils-python-utils"
+    "dbus-tools"
 )
 
 for package in "${PACKAGES[@]}"; do
