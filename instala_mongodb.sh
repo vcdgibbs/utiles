@@ -393,6 +393,10 @@ sudo systemctl enable mongod
 sudo systemctl start mongod
 sudo systemctl status mongod
 
+# Modifica el parámetro use_devicesfile a 0 como lo exige NDB.
+sudo sed -i "s/# use_devicesfile = 1/use_devicesfile = 0/" /etc/lvm/lvm.conf
+cat /etc/lvm/lvm.conf | grep use_devicesfile
+log_info "Parámetro use_devicesfile modificado a 0"
 
 ############################################################
 ## Crear el usuario administrador inicial
