@@ -61,7 +61,7 @@ done
 
 log_info "Deshabilitar SELinux y dejar Firewalld e IPTables"
 
-sudo set-enforce 0
+sudo setenforce 0
 sudo sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
 
 sudo systemctl enable firewalld
