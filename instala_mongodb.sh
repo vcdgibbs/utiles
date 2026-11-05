@@ -45,6 +45,9 @@ PACKAGES=(
     "xz-libs"
     "policycoreutils-python-utils"
     "dbus-tools"
+    "firewalld"
+    "iptables-services"
+    "iptables-utils"
 )
 
 for package in "${PACKAGES[@]}"; do
@@ -56,13 +59,25 @@ for package in "${PACKAGES[@]}"; do
     fi
 done
 
+log_info "Deshabilitar SELinux y dejar Firewalld e IPTables"
+
+sudo set-enforce 0
+sudo sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+
+sudo systemctl enable firewalld
+sudo systemctl start firewalld
+sudo systemctl enable iptables
+sudo systemctl start iptables
+
 #######################
 # Modificar GRUB
 #######################
 if ! [ -f "$PWD/.grub" ]; then 
     GRUB_FILE="/etc/default/grub"
-    PARAMS="numa=off transparent_hugepage=never scsi_mod.use_blk_mq=1 dm_mod.use_blk_mq=y"
-
+    # PARAMS="numa=off transparent_hugepage=never scsi_mod.use_blk_mq=1 dm_mod.use_blk_mq=y"
+    # Agregué SELinux=0 para dejarlo deshabilitado a nivel de kernel
+    PARAMS="numa=off transparent_hugepage=never scsi_mod.use_blk_mq=1 dm_mod.use_blk_mq=y selinux=0"
+    
     # Backup
     sudo cp -a "$GRUB_FILE" "${GRUB_FILE}.bak"
 
@@ -70,7 +85,7 @@ if ! [ -f "$PWD/.grub" ]; then
     sudo sed -i -E \
     "s|^(GRUB_CMDLINE_LINUX_DEFAULT=\"[^\"]*)\"|\1 ${PARAMS}\"|" \
     "$GRUB_FILE"
-
+    
     # Regenerar configuración de GRUB
     sudo grub2-mkconfig -o /boot/grub2/grub.cfg --update-bls-cmdline
 
@@ -169,9 +184,14 @@ check_user() {
     fi
 }
 
-USERNAME="mongod"
+USUARIO=(
+  "mongod"
+  "ndb"
+)
+
 # Crear usuario si no existe
-if ! id "$USERNAME" >/dev/null 2>&1; then
+for USERNAME in "${USUARIO[@]}"; do
+  if ! id "$USERNAME" >/dev/null 2>&1; then
     #echo "[INFO] Creando usuario '$USERNAME'..."
     log_info "Creando usuario '$USERNAME'..."
     sudo useradd \
@@ -183,13 +203,13 @@ if ! id "$USERNAME" >/dev/null 2>&1; then
 
     #echo "[OK] Usuario '$USERNAME' creado."
     log_info "Usuario '$USERNAME' creado."
-fi
+  fi
 
-# Crear configuración sudoers
-if ! sudo test -f "/etc/sudoers.d/$USERNAME"; then
+  # Crear configuración sudoers
+  if ! sudo test -f "/etc/sudoers.d/$USERNAME"; then
     log_info "Configurando sudoers para '$USERNAME'..."
     sudo tee "/etc/sudoers.d/$USERNAME" > /dev/null <<EOF
-$USERNAME ALL=(ALL) ALL
+$USERNAME ALL=(ALL) NOPASSWD: ALL
 EOF
 
     sudo chmod 440 "/etc/sudoers.d/$USERNAME"
@@ -201,11 +221,11 @@ EOF
         sudo rm -f "/etc/sudoers.d/$USERNAME"
         exit 1
     fi
-fi
+  fi
 
-
-# Comprobar configuración final
-check_user "$USERNAME"
+  # Comprobar configuración final
+ check_user "$USERNAME"
+done
 
 #################################
 ## Modificar limits.conf
