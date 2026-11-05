@@ -449,3 +449,18 @@ log_info "Parámetro use_devicesfile modificado a 0"
 ##   -u admin \
 ##   -p
 ##################################################################
+
+echo "/mongodb_software/bin/mongosh --host 127.0.0.1 --port 27017"
+echo " "
+echo "use admin"
+echo " "
+echo 'db.createUser({'
+echo '  user: "admin",'
+echo '  pwd: "<password>",'
+echo '  roles: ['
+echo '  { role: "root", db: "admin" }'
+echo '   ]'
+echo ' })'
+echo " "
+echo "/mongodb_software/bin/mongosh --host 127.0.0.1 --port 27017 --authenticationDatabase admin -u admin -p"
+echo " "
