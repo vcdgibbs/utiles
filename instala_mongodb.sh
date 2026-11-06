@@ -1,6 +1,19 @@
 #!/bin/bash
-
 set -euo pipefail
+
+####################################################
+##
+## Esta instalación es para registrarla con NDB 2.11
+##
+## Según matriz de compatibilidad en:
+## https://portal.nutanix.com/page/documents/details?targetId=Release-Notes-Nutanix-NDB-v2_11_1:v21-ndb-compatibility-mongodb-r.html
+##
+## Rocky Linux 9.7
+## https://dl.rockylinux.org/vault/rocky/9.7/images/x86_64/Rocky-9-GenericCloud-Base-9.7-20251123.2.x86_64.qcow2
+##
+## MongoDB 8.0.34
+## https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-rhel93-8.0.34.tgz
+####################################################
 
 ###########
 # Preludio
@@ -314,18 +327,18 @@ extract_files() {
 
 log_info "Bajando MongoDB"
 
-download_file https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-rhel93-8.0.23.tgz
+download_file https://fastdl.mongodb.org/linux/mongodb-linux-x86_64-rhel93-8.0.34.tgz
 download_file https://fastdl.mongodb.org/tools/db/mongodb-database-tools-rhel93-x86_64-100.17.0.tgz 
 download_file https://downloads.mongodb.com/compass/mongosh-2.6.0-linux-x64.tgz 
 
 log_info "Extrayendo archivos"
-extract_files mongodb-linux-x86_64-rhel93-8.0.23.tgz
+extract_files mongodb-linux-x86_64-rhel93-8.0.34.tgz
 extract_files mongodb-database-tools-rhel93-x86_64-100.17.0.tgz 
 extract_files mongosh-2.6.0-linux-x64.tgz  
 
 log_info "Moviendo software a /mongodb_softwre/bin"
 sudo mv mongodb-database-tools-rhel93-x86_64-100.17.0/bin/* /mongodb_software/bin
-sudo mv mongodb-linux-x86_64-rhel93-8.0.23/bin/* /mongodb_software/bin
+sudo mv mongodb-linux-x86_64-rhel93-8.0.34/bin/* /mongodb_software/bin
 sudo mv mongosh-2.6.0-linux-x64/bin/* /mongodb_software/bin
 
 sudo chown root:root /mongodb_software/bin/*
